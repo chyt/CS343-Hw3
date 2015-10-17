@@ -1,6 +1,7 @@
 from OpenNero import *
 from common import *
 import random
+import math
 
 import Maze
 from Maze.constants import *
@@ -180,6 +181,61 @@ class MyTilingRLAgent(MyTabularRLAgent):
         """
         MyTabularRLAgent.__init__(self, gamma, alpha, epsilon) # initialize the superclass
 
+    def predict(self, observations, action):
+        """
+        Look up the Q-value for the given state (observations), action pair.
+        """
+
+        row = (observations[0]-10)/2.5
+        col = (observations[1]-10)/2.5
+
+        big_row = math.floor(row/8)
+        big_col = math.floor(col/8)
+
+        big_list = (big_row, big_col)
+        o = tuple(big_list)
+
+        #print "predicting"
+        #print "row: %s | col: %s | tuple: %s" % (row, col, o)
+
+        if o not in self.Q:
+            return 0
+        else:
+            return self.Q[o][action]
+
+    def update(self, observations, action, new_value):
+        """
+        Update the Q-function table with the new value for the (state, action) pair
+        and update the blocks drawing.
+        """
+        actions = self.get_possible_actions(observations)
+
+        #row and col contain the current fine-tiled row and column position
+        row = (observations[0]-10)/2.5
+        col = (observations[1]-10)/2.5
+
+        #big_row and big_col find the overall larger tile position
+        big_row = math.floor(row/8)
+        big_col = math.floor(col/8)
+
+        big_list = (big_row, big_col)
+        o = tuple(big_list)
+
+        #print "updating"
+        #print "row: %s | col: %s | tuple: %s" % (row, col, o)
+
+        if o not in self.Q:
+            self.Q[o] = [0 for a in actions]
+        self.Q[o][action] = new_value
+
+        draw_o = tuple([x for x in observations])
+        #print "o: %s" % (draw_o,)
+        #print "self.Q[o]: %s" % (self.Q[o])
+        #print "action: %s" % (action)
+        #print "new_value: %s" % (new_value)
+        #self.draw_q(draw_o)
+
+        print "Q values: %s" % (self.Q)
 
 class MyNearestNeighborsRLAgent(MyTabularRLAgent):
     """
@@ -194,5 +250,3 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         @param epsilon parameter for the epsilon-greedy policy (between 0 and 1)
         """
         MyTabularRLAgent.__init__(self, gamma, alpha, epsilon) # initialize the superclass
-
-
