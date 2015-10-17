@@ -211,12 +211,12 @@ class MyTilingRLAgent(MyTabularRLAgent):
         actions = self.get_possible_actions(observations)
 
         #row and col contain the current fine-tiled row and column position
-        row = (observations[0]-10)/2.5
-        col = (observations[1]-10)/2.5
+        row = (observations[0]-10)/20
+        col = (observations[1]-10)/20
 
         #big_row and big_col find the overall larger tile position
-        big_row = math.floor(row/8)
-        big_col = math.floor(col/8)
+        big_row = math.floor(row)
+        big_col = math.floor(col)
 
         big_list = (big_row, big_col)
         o = tuple(big_list)
@@ -233,9 +233,33 @@ class MyTilingRLAgent(MyTabularRLAgent):
         #print "self.Q[o]: %s" % (self.Q[o])
         #print "action: %s" % (action)
         #print "new_value: %s" % (new_value)
-        #self.draw_q(draw_o)
+        self.draw_q(draw_o)
 
-        print "Q values: %s" % (self.Q)
+    def draw_q(self, o):
+        e = get_environment()
+        if hasattr(e, 'draw_q'):
+            row = (o[0]-10)/20
+            col = (o[1]-10)/20
+            big_row = math.floor(row)
+            big_col = math.floor(col)
+            big_list = (big_row, big_col)
+            tup_list = tuple(big_list)
+            q_values = self.Q[tup_list]
+
+            draw_Q = {}
+            min_row = big_row*20+10
+            min_col = big_col*20+10
+
+            for x in range(0, 8):
+                for y in range(0, 8):
+                    temp_list = (min_row, min_col, 1, 1, 1, 1)
+                    temp_tuple = tuple(temp_list)
+                    draw_Q[temp_tuple] = q_values
+                    e.draw_q(temp_tuple, draw_Q)
+                    print "row: %s | col: %s" % (min_row, min_col)
+                    min_row = min_row + 2.5
+                min_col = min_col + 2.5
+                min_row = min_row - 20
 
 class MyNearestNeighborsRLAgent(MyTabularRLAgent):
     """
