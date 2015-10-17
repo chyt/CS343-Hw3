@@ -186,14 +186,8 @@ class MyTilingRLAgent(MyTabularRLAgent):
         Look up the Q-value for the given state (observations), action pair.
         """
 
-        row = (observations[0]-10)/2.5
-        col = (observations[1]-10)/2.5
-
-        big_row = math.floor(row/8)
-        big_col = math.floor(col/8)
-
-        big_list = (big_row, big_col)
-        o = tuple(big_list)
+        xy_list = get_environment().maze.xy2rc(observations[0], observations[1])
+        o = tuple(xy_list)
 
         #print "predicting"
         #print "row: %s | col: %s | tuple: %s" % (row, col, o)
@@ -210,16 +204,8 @@ class MyTilingRLAgent(MyTabularRLAgent):
         """
         actions = self.get_possible_actions(observations)
 
-        #row and col contain the current fine-tiled row and column position
-        row = (observations[0]-10)/20
-        col = (observations[1]-10)/20
-
-        #big_row and big_col find the overall larger tile position
-        big_row = math.floor(row)
-        big_col = math.floor(col)
-
-        big_list = (big_row, big_col)
-        o = tuple(big_list)
+        xy_list = get_environment().maze.xy2rc(observations[0], observations[1])
+        o = tuple(xy_list)
 
         #print "updating"
         #print "row: %s | col: %s | tuple: %s" % (row, col, o)
@@ -238,17 +224,13 @@ class MyTilingRLAgent(MyTabularRLAgent):
     def draw_q(self, o):
         e = get_environment()
         if hasattr(e, 'draw_q'):
-            row = (o[0]-10)/20
-            col = (o[1]-10)/20
-            big_row = math.floor(row)
-            big_col = math.floor(col)
-            big_list = (big_row, big_col)
-            tup_list = tuple(big_list)
+            xy_list = e.maze.xy2rc(o[0], o[1])
+            tup_list = tuple(xy_list)
             q_values = self.Q[tup_list]
 
             draw_Q = {}
-            min_row = big_row*20+10
-            min_col = big_col*20+10
+            min_row = xy_list[0]*20+10
+            min_col = xy_list[1]*20+10
 
             for x in range(0, 8):
                 for y in range(0, 8):
