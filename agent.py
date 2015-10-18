@@ -25,17 +25,17 @@ class MyTabularRLAgent(AgentBrain):
         self.alpha = alpha
         self.epsilon = epsilon
         """
-        Our Q-function table. Maps from a tuple of observations (state) to 
+        Our Q-function table. Maps from a tuple of observations (state) to
         another map of actions to Q-values. To look up a Q-value, call the predict method.
         """
         self.Q = {} # our Q-function table
-        print 
-    
+        print
+
     def __str__(self):
         return self.__class__.__name__ + \
             ' with gamma: %g, alpha: %g, epsilon: %g' \
             % (gamma, alpha, epsilon)
-    
+
     def initialize(self, init_info):
         """
         Create a new agent using the init_info sent by the environment
@@ -43,7 +43,7 @@ class MyTabularRLAgent(AgentBrain):
         self.action_info = init_info.actions
         self.sensor_info = init_info.sensors
         return True
-    
+
     def predict(self, observations, action):
         """
         Look up the Q-value for the given state (observations), action pair.
@@ -53,7 +53,7 @@ class MyTabularRLAgent(AgentBrain):
             return 0
         else:
             return self.Q[o][action]
-    
+
     def update(self, observations, action, new_value):
         """
         Update the Q-function table with the new value for the (state, action) pair
@@ -65,7 +65,7 @@ class MyTabularRLAgent(AgentBrain):
             self.Q[o] = [0 for a in actions]
         self.Q[o][action] = new_value
         self.draw_q(o)
-    
+
     def draw_q(self, o):
         e = get_environment()
         if hasattr(e, 'draw_q'):
@@ -79,7 +79,7 @@ class MyTabularRLAgent(AgentBrain):
         aMax = self.action_info.max(0)
         actions = range(int(aMin), int(aMax+1))
         return actions
-        
+
     def get_max_action(self, observations):
         """
         get the action that is currently estimated to produce the highest Q
@@ -108,7 +108,7 @@ class MyTabularRLAgent(AgentBrain):
             # we need to get the max action
             (max_action, max_value) = self.get_max_action(observations)
             return max_action
-    
+
     def start(self, time, observations):
         """
         Called to figure out the first action given the first observations
@@ -128,22 +128,22 @@ class MyTabularRLAgent(AgentBrain):
         """
         # get the reward from the previous action
         r = reward[0]
-        
+
         # get the updated epsilon, in case the slider was changed by the user
         self.epsilon = get_environment().epsilon
-        
+
         # get the old Q value
         Q_old = self.predict(self.previous_observations, self.previous_action)
-        
+
         # get the max expected value for our possible actions
         (max_action, max_value) = self.get_max_action(observations)
-        
+
         # update the Q value
         self.update( \
             self.previous_observations, \
             self.previous_action, \
             Q_old + self.alpha * (r + self.gamma * max_value - Q_old) )
-        
+
         # select the action to take
         action = self.get_epsilon_greedy(observations, max_action, max_value)
         self.previous_observations = observations
@@ -355,20 +355,57 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
             if neighbor != 0:
                 reachable_neighbors.append(neighbor)
 
-        print "reachable neighbors of tile (%s, %s): %s" % (r, c, reachable_neighbors)
+        #print "reachable neighbors of tile (%s, %s): %s" % (r, c, reachable_neighbors)
 
+        min_distance1 = sys.maxint
+        closest_neighbor1 = 0
+        min_distance2 = sys.maxint
+        closest_neighbor2 = 0
+        min_distance3 = sys.maxint
+        closest_neighbor3 = 0
         for neighbor in reachable_neighbors:
-            neighbor_x = neighbor[0]*20+8.75
-            neighbor_y = neighbor[1]*20+8.75
+            neighbor_x = neighbor[0]*20+18.75
+            neighbor_y = neighbor[1]*20+18.75
             diff_x = abs(observations[0] - neighbor_x)
             diff_y = abs(observations[1] - neighbor_y)
             distance = math.sqrt(diff_x*diff_x + diff_y*diff_y)
+            if distance < min_distance1:
+                min_distance3 = min_distance2
+                closest_neighbor3 = closest_neighbor2
+                min_distance2 = min_distance1
+                closest_neighbor2 = closest_neighbor1
+                min_distance1 = distance
+                closest_neighbor1 = neighbor
+            elif distance < min_distance2:
+                min_distance3 = min_distance2
+                closest_neighbor3 = closest_neighbor2
+                min_distance2 = distance
+                closest_neighbor2 = neighbor
+            elif distance < min_distance3:
+                min_distance3 = distance
+                closest_neighbor3 = neighbor
 
-            print "difference between current position and tile (%s, %s) is %s" % (neighbor[0], neighbor[1], distance)
+            print "difference between current position: spot(%s, %s) at tile(%s, %s) and spot(%s, %s) at tile(%s, %s) is %s" % (observations[0], observations[1], r, c, neighbor_x, neighbor_y, neighbor[0], neighbor[1], distance)
 
-        return 0
+        print "closest neighbors are %s ----- %s ----- %s" %(closest_neighbor1, closest_neighbor2, closest_neighbor3)
+
+        if observations not in self.Q:
+            return 0
+        else:
+            return findValue(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
 
     def calculateCorners(self, all_neighbors, x, y, z):
         if all_neighbors[x] != 0 and all_neighbors[y] != 0 and all_neighbors[z] != 0:
             return ((all_neighbors[x],all_neighbors[y]) in self.maze_walls or (all_neighbors[y],all_neighbors[4]) in self.maze_walls) and ((all_neighbors[x],all_neighbors[z]) in self.maze_walls or (all_neighbors[z],all_neighbors[4]) in self.maze_walls)
         return True
+
+    def findValue(self, neighbor_a, neighbor_b, neighbor_c, dist_a, dist_b, dist_c):
+        dist_sum = dist_a + dist_b + dist_c
+        weight_a = 1 - (dist_a/dist_sum)
+        weight_b = 1 - (dist_b/dist_sum)
+        weight_c = 1 - (dist_c/dist_sum)
+        old_val_a = self.Q[neighbor_a]
+        old_val_b = self.Q[neighbor_b]
+        old_val_c = self.Q[neighbor_c]
+        return old_val_a * weight_a + old_val_b * weight_b + old_val_c * weight_c
+
