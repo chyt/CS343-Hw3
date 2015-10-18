@@ -180,14 +180,35 @@ class MyTilingRLAgent(MyTabularRLAgent):
         @param epsilon parameter for the epsilon-greedy policy (between 0 and 1)
         """
         MyTabularRLAgent.__init__(self, gamma, alpha, epsilon) # initialize the superclass
+        self.O = {} # create a new dictionary to store observations at each (r, c)
+
+    def get_possible_actions(self, observations):
+        """
+        Get the possible actions that can be taken given the state (observations)
+        """
+        rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
+        o = tuple(rc_list)
+
+        aMin = self.action_info.min(0)
+        aMax = self.action_info.max(0)
+        actions = range(int(aMin), int(aMax+1))
+
+        if o in self.O:
+            for action in actions:
+                if self.O[o][action] == 1:
+                    actions.remove(action)
+
+        #print "possible actions are: %s" % (actions)
+
+        return actions
 
     def predict(self, observations, action):
         """
         Look up the Q-value for the given state (observations), action pair.
         """
 
-        xy_list = get_environment().maze.xy2rc(observations[0], observations[1])
-        o = tuple(xy_list)
+        rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
+        o = tuple(rc_list)
 
         #print "predicting"
         #print "row: %s | col: %s | tuple: %s" % (row, col, o)
@@ -199,13 +220,24 @@ class MyTilingRLAgent(MyTabularRLAgent):
 
     def update(self, observations, action, new_value):
         """
-        Update the Q-function table with the new value for the (state, action) pair
+        First, look at observations and record to self.O if there are any walls. Then, update the Q-function table with the new value for the (state, action) pair
         and update the blocks drawing.
         """
+
+        #print "observations: %s, %s, %s, %s" % (observations[2],observations[3],observations[4],observations[5])
+
         actions = self.get_possible_actions(observations)
 
-        xy_list = get_environment().maze.xy2rc(observations[0], observations[1])
-        o = tuple(xy_list)
+        rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
+        o = tuple(rc_list)
+
+        if o not in self.O:
+            self.O[o] = [0, 0, 0, 0]
+
+        for x in range(0, 4):
+            if observations[x+2]<1.0:
+                self.O[o][x] = 1
+                print "ELIMINATED ACTION: action %s at position %s, %s" % (x, o[0], o[1])
 
         #print "updating"
         #print "row: %s | col: %s | tuple: %s" % (row, col, o)
@@ -216,7 +248,7 @@ class MyTilingRLAgent(MyTabularRLAgent):
 
         draw_o = tuple([x for x in observations])
         #print "o: %s" % (draw_o,)
-        #print "self.Q[o]: %s" % (self.Q[o])
+        print "self.Q[o]: %s" % (self.Q[o])
         #print "action: %s" % (action)
         #print "new_value: %s" % (new_value)
         self.draw_q(draw_o)
@@ -224,13 +256,13 @@ class MyTilingRLAgent(MyTabularRLAgent):
     def draw_q(self, o):
         e = get_environment()
         if hasattr(e, 'draw_q'):
-            xy_list = e.maze.xy2rc(o[0], o[1])
-            tup_list = tuple(xy_list)
+            rc_list = e.maze.xy2rc(o[0], o[1])
+            tup_list = tuple(rc_list)
             q_values = self.Q[tup_list]
 
             draw_Q = {}
-            min_row = xy_list[0]*20+10
-            min_col = xy_list[1]*20+10
+            min_row = rc_list[0]*20+10
+            min_col = rc_list[1]*20+10
 
             for x in range(0, 8):
                 for y in range(0, 8):
@@ -238,7 +270,7 @@ class MyTilingRLAgent(MyTabularRLAgent):
                     temp_tuple = tuple(temp_list)
                     draw_Q[temp_tuple] = q_values
                     e.draw_q(temp_tuple, draw_Q)
-                    print "row: %s | col: %s" % (min_row, min_col)
+                    #print "row: %s | col: %s" % (min_row, min_col)
                     min_row = min_row + 2.5
                 min_col = min_col + 2.5
                 min_row = min_row - 20
@@ -256,3 +288,87 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         @param epsilon parameter for the epsilon-greedy policy (between 0 and 1)
         """
         MyTabularRLAgent.__init__(self, gamma, alpha, epsilon) # initialize the superclass
+
+        self.maze_walls = []
+        for wall_set in get_environment().maze.walls:
+            self.maze_walls.append(wall_set)
+            inverted_set = (wall_set[1], wall_set[0])
+            self.maze_walls.append(inverted_set)
+
+        print "maze_walls: %s" % self.maze_walls
+
+    def predict(self, observations, action):
+        """
+        Look up the Q-value for the given state (observations), action pair.
+        """
+        x, y = observations[0], observations[1]
+
+        #print "current position is %s, %s; we are considering action %s" % (x, y, action)
+
+        #get new position
+        if action==0:
+            y = y + 2.5
+        elif action==1:
+            y = y - 2.5
+        elif action==2:
+            x = x + 2.5
+        else:
+            x = x - 2.5
+
+        #print "after action, new position is %s, %s" % (x,y)
+
+        r, c = get_environment().maze.xy2rc(x, y)
+
+        all_neighbors = []
+        for row in range(r-1, r+2):
+            for col in range(c-1, c+2):
+                if row >= 0 and row < ROWS and col >= 0 and col < COLS:
+                    temp_list = (row,col)
+                    all_neighbors.append(tuple(temp_list))
+                else:
+                    all_neighbors.append(0)
+
+        not_neighbors = []
+
+        for i in [1,3,5,7]:
+            if all_neighbors[i] != 0 and (all_neighbors[i], all_neighbors[4]) in self.maze_walls:
+                not_neighbors.append(i)
+
+        if self.calculateCorners(all_neighbors, 0, 3, 1):
+            not_neighbors.append(0)
+
+        if self.calculateCorners(all_neighbors, 2, 1, 5):
+            not_neighbors.append(2)
+
+        if self.calculateCorners(all_neighbors, 6, 7, 3):
+            not_neighbors.append(6)
+
+        if self.calculateCorners(all_neighbors, 8, 7, 5):
+            not_neighbors.append(8)
+
+        for i in not_neighbors:
+            all_neighbors[i] = 0
+
+        reachable_neighbors = []
+
+        for neighbor in all_neighbors:
+            if neighbor != 0:
+                reachable_neighbors.append(neighbor)
+
+        print "reachable neighbors of tile (%s, %s): %s" % (r, c, reachable_neighbors)
+
+        for neighbor in reachable_neighbors:
+            neighbor_x = neighbor[0]*20+8.75
+            neighbor_y = neighbor[1]*20+8.75
+            diff_x = abs(observations[0] - neighbor_x)
+            diff_y = abs(observations[1] - neighbor_y)
+            distance = math.sqrt(diff_x*diff_x + diff_y*diff_y)
+
+            print "difference between current position and tile (%s, %s) is %s" % (neighbor[0], neighbor[1], distance)
+
+        return 0
+
+    def calculateCorners(self, all_neighbors, x, y, z):
+        if all_neighbors[x] != 0 and all_neighbors[y] != 0 and all_neighbors[z] != 0:
+            return ((all_neighbors[x],all_neighbors[y]) in self.maze_walls or (all_neighbors[y],all_neighbors[4]) in self.maze_walls) and ((all_neighbors[x],all_neighbors[z]) in self.maze_walls or (all_neighbors[z],all_neighbors[4]) in self.maze_walls)
+        return True
