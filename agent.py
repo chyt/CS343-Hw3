@@ -296,6 +296,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
             self.maze_walls.append(inverted_set)
 
         print "maze_walls: %s" % self.maze_walls
+        self.weights = {}
 
     def predict(self, observations, action):
         """
@@ -389,6 +390,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         print "closest neighbors are %s ----- %s ----- %s" %(closest_neighbor1, closest_neighbor2, closest_neighbor3)
 
+
         if observations not in self.Q:
             return 0
         else:
@@ -407,5 +409,59 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         old_val_a = self.Q[neighbor_a]
         old_val_b = self.Q[neighbor_b]
         old_val_c = self.Q[neighbor_c]
+        self.weights = {neighbor_a: weight_a, neighbor_b: weight_b, neighbor_c: weight_c}
         return old_val_a * weight_a + old_val_b * weight_b + old_val_c * weight_c
 
+    def act(self, time, observations, reward):
+        """
+        return an action given the reward for the previous action and the new observations
+        @param time current time
+        @param observations a DoubleVector of observations for the agent (use len() and [])
+        @param the reward for the agent
+        """
+        # get the reward from the previous action
+        r = reward[0]
+
+        # get the updated epsilon, in case the slider was changed by the user
+        self.epsilon = get_environment().epsilon
+
+        # get the old Q value
+        Q_old = self.predict(self.previous_observations, self.previous_action)
+
+        # get the max expected value for our possible actions
+        (max_action, max_value) = self.get_max_action(observations)
+
+        # update the Q values for neighboring tiles
+        for neighbor, weight in self.weights:
+            self.update( \
+                self.previous_observations, \
+                self.previous_action, \
+                self.Q[neighbor] + self.alpha * weight * (r + self.gamma * max_value - Q_old) )
+
+        # select the action to take
+        action = self.get_epsilon_greedy(observations, max_action, max_value)
+        self.previous_observations = observations
+        self.previous_action = action
+        return action
+
+    def draw_q(self, o):
+        e = get_environment()
+        if hasattr(e, 'draw_q'):
+            rc_list = e.maze.xy2rc(o[0], o[1])
+            tup_list = tuple(rc_list)
+            q_values = self.Q[tup_list]
+
+            draw_Q = {}
+            min_row = rc_list[0]*20+10
+            min_col = rc_list[1]*20+10
+
+            for x in range(0, 8):
+                for y in range(0, 8):
+                    temp_list = (min_row, min_col, 1, 1, 1, 1)
+                    temp_tuple = tuple(temp_list)
+                    draw_Q[temp_tuple] = q_values
+                    e.draw_q(temp_tuple, draw_Q)
+                    #print "row: %s | col: %s" % (min_row, min_col)
+                    min_row = min_row + 2.5
+                min_col = min_col + 2.5
+                min_row = min_row - 20
