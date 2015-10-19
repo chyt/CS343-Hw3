@@ -394,11 +394,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         rclist = (r,c)
         rc = tuple(rclist)
-        if rc not in self.Q:
-            return 0
-        else:
-            print "calling findValue"
-            return findValue(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
+        return self.findValue(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
 
     def calculateCorners(self, all_neighbors, x, y, z):
         if all_neighbors[x] != 0 and all_neighbors[y] != 0 and all_neighbors[z] != 0:
@@ -411,9 +407,18 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         weight_a = 1 - (dist_a/dist_sum)
         weight_b = 1 - (dist_b/dist_sum)
         weight_c = 1 - (dist_c/dist_sum)
-        old_val_a = self.Q[neighbor_a]
-        old_val_b = self.Q[neighbor_b]
-        old_val_c = self.Q[neighbor_c]
+        if neighbor_a not in self.Q:
+            old_val_a = 0
+        else:
+            old_val_a = self.Q[neighbor_a]
+        if neighbor_b not in self.Q:
+            old_val_b = 0
+        else:
+            old_val_b = self.Q[neighbor_b]
+        if neighbor_c not in self.Q:
+            old_val_c = 0
+        else:
+            old_val_c = self.Q[neighbor_c]
         self.weights = {neighbor_a: weight_a, neighbor_b: weight_b, neighbor_c: weight_c}
         print "weights for %s, %s, %s are %s" % (neighbor_a, neighbor_b, neighbor_c, self.weights)
         return old_val_a * weight_a + old_val_b * weight_b + old_val_c * weight_c
@@ -451,11 +456,14 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         (max_action, max_value) = self.get_max_action(observations)
 
         # update the Q values for neighboring tiles
-        for neighbor, weight in self.weights:
-            self.update( \
-                self.previous_observations, \
-                self.previous_action, \
-                self.Q[neighbor] + self.alpha * weight * (r + self.gamma * max_value - Q_old) )
+        print "self.weights ---> %s" %self.weights
+        for (neighbor, weight) in self.weights:
+            if neighbor != 0:
+                print "neighbor is ----------------> %s" % neighbor
+                self.update( \
+                    self.previous_observations, \
+                    self.previous_action, \
+                    self.Q[neighbor] + self.alpha * weight * (r + self.gamma * max_value - Q_old) )
 
         # select the action to take
         action = self.get_epsilon_greedy(observations, max_action, max_value)
