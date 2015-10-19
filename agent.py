@@ -390,10 +390,14 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         print "closest neighbors are %s ----- %s ----- %s" %(closest_neighbor1, closest_neighbor2, closest_neighbor3)
 
+        print "self.Q is %s" % (self.Q)
 
-        if observations not in self.Q:
+        rclist = (r,c)
+        rc = tuple(rclist)
+        if rc not in self.Q:
             return 0
         else:
+            print "calling findValue"
             return findValue(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
 
     def calculateCorners(self, all_neighbors, x, y, z):
@@ -402,6 +406,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         return True
 
     def findValue(self, neighbor_a, neighbor_b, neighbor_c, dist_a, dist_b, dist_c):
+        print "findValue called"
         dist_sum = dist_a + dist_b + dist_c
         weight_a = 1 - (dist_a/dist_sum)
         weight_b = 1 - (dist_b/dist_sum)
@@ -410,7 +415,21 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         old_val_b = self.Q[neighbor_b]
         old_val_c = self.Q[neighbor_c]
         self.weights = {neighbor_a: weight_a, neighbor_b: weight_b, neighbor_c: weight_c}
+        print "weights for %s, %s, %s are %s" % (neighbor_a, neighbor_b, neighbor_c, self.weights)
         return old_val_a * weight_a + old_val_b * weight_b + old_val_c * weight_c
+
+    def update(self, observations, action, new_value):
+        """
+        Update the Q-function table with the new value for the (state, action) pair
+        and update the blocks drawing.
+        """
+        print "update called"
+        o = tuple([x for x in observations])
+        actions = self.get_possible_actions(observations)
+        if o not in self.Q:
+            self.Q[o] = [0 for a in actions]
+        self.Q[o][action] = new_value
+        self.draw_q(o)
 
     def act(self, time, observations, reward):
         """
