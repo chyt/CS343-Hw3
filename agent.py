@@ -393,8 +393,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         rclist = (r,c)
         rc = tuple(rclist)
-        self.value = self.findValue(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
-        return self.value
+        return self.findValue(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
 
     def calculateCorners(self, all_neighbors, x, y, z):
         if all_neighbors[x] != 0 and all_neighbors[y] != 0 and all_neighbors[z] != 0:
@@ -485,7 +484,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
                 print "neighbor is ----------------> (%s, %s)" % (neighbor[0], neighbor[1])
                 self.update( \
                     neighbor, \
-                    self.Q[neighbor] + self.alpha * self.weights[neighbor] * (r + self.gamma * max_value - self.value) )
+                    self.Q[neighbor] + self.alpha * self.weights[neighbor] * (r + self.gamma * max_value - max_value )
 
         # select the action to take
         action = self.get_epsilon_greedy(observations, max_action, max_value)
