@@ -1,0 +1,12 @@
+No special instructions needed to run agent
+
+Tiling Approximator:
+We have a dictionary of Q-values for each tile(r,c) and we map tiles(x,y) to every tile(r,c) that contains the tile(x,y).
+We modified Predict and Update, so that for each tile(x,y) we use the Q-value of the corresponding tile(r,c) to predict the direction to move in.
+    Furthermore, for Update, when we are given information about our surroundings for any tile(x,y) i.e. a wall, we update the Q-value for the corresponding tile(r,c).
+    This allowed us to save space for our Q-values (we end up storing 64 times less values)
+We also modified the get_possible_actions method so that if we find encounter a wall while moving in a certain direction in a tile(x,y), we remove this direction from the possible actions for any tile(x,y) within a tile(r,c). This prevents us from running into the same wall again.
+
+Nearest Neighbor Approximator:
+    We updated Predict so that it finds the new position (x,y), based on an action from our previous position (x',y'), and finds the 3 (or less) closest neighboring reachable tiles(r,c). Afterwards, we use a function: find_value to obtain the weights of each neighboring tile(r,c) and find the value of this new tile(x,y) using the weights and old Q-values. We then call this for every surrounding tile(x,y) of our current tile(x',y') to find which one has the max Q-value. We take the
+action that takes us to the position with the max value, and then we update the three neighboring tiles(r,c) of this position (x,y) with the given equation.
