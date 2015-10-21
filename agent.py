@@ -359,7 +359,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
             if neighbor != 0:
                 reachable_neighbors.append(neighbor)
 
-        #print "reachable neighbors of tile (%s, %s): %s" % (r, c, reachable_neighbors)
+        print "reachable neighbors of tile (%s, %s): %s" % (r, c, reachable_neighbors)
 
         min_distance1 = sys.maxint
         closest_neighbor1 = 0
@@ -426,7 +426,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         elif neighbor_c != 0:
             self.Q[neighbor_c] = 0
 
-        print "Self.Q is %s" % (self.Q)
+        #print "Self.Q is %s" % (self.Q)
 
         weights = {neighbor_a: weight_a, neighbor_b: weight_b, neighbor_c: weight_c}
         #print "weights for %s, %s, %s are %s" % (neighbor_a, neighbor_b, neighbor_c, weights)
@@ -436,7 +436,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
     def update(self, tile, new_value):
         """
-        First, look at observations and record to self.O if there are any walls. Then, update the Q-function table with the new value for the (state, action) pair
+        Update the Q-function table with the new value for the (state, action) pair
         and update the blocks drawing.
         """
 
@@ -446,27 +446,29 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         o = tuple(rc_list)
         self.Q[o] = new_value
 
-        print "UPDATING: self.Q[(%s, %s)]: %s" % (o[0], o[1], self.Q[o])
+        #print "UPDATING: self.Q[(%s, %s)]: %s" % (o[0], o[1], self.Q[o])
 
     def get_max_action(self, observations):
         """
         get the action that is currently estimated to produce the highest Q
         """
-        actions = self.get_possible_actions(observations)
-        max_action = actions[0]
-        (action, weights) = self.predict(observations, max_action)
-        max_value = action
-        max_weights = weights
-        for a in actions[1:]:
+        #actions = self.get_possible_actions(observations)
+        actions = [0, 1, 2, 3]
+        max_value = 0-sys.maxint
+        max_action = -1
+        max_weights = 0
+        for a in actions:
             (value, weights) = self.predict(observations, a)
+            print "VALUE: %s" % value
             if value > max_value:
+                print "MAX VALUE IS NOW %s" % (value)
                 max_value = value
                 max_action = a
                 max_weights = weights
         return (max_action, max_value, max_weights)
 
     def max_new_neighbors(self, action, observations):
-        print "GETTING MAX NEW NEIGHBORS"
+        #print "GETTING MAX NEW NEIGHBORS"
         (x, y) = self.get_new_x_y(action, observations[0], observations[1])
         new_observations = [x, y]
         (max_action, max_value, max_weights) = self.get_max_action(new_observations)
@@ -509,7 +511,8 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         #print "Max weights ---> %s" % max_weights
         for neighbor in max_weights:
             if neighbor != 0:
-                print "\n\n-----CALCULATING NEW Q VALUE-------"
+                new_q = self.Q[neighbor] + self.alpha * max_weights[neighbor] * (r + self.gamma * max_new_neighbors -  max_value )
+                print "\n\n-----START CALCULATING NEW Q VALUE FOR TILE (%s, %s) -------" % (neighbor[0], neighbor[1])
                 print "Original Q value: %s" % (self.Q[neighbor])
                 print "self.alpha: %s" % (self.alpha)
                 print "max_weights[neighbor]: %s" % (max_weights[neighbor])
@@ -517,10 +520,9 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
                 print "self.gamma: %s" % (self.gamma)
                 print "max_new_neighbors: %s" % (max_new_neighbors)
                 print "max_value: %s" % (max_value)
+                print "New Q value: %s" % (new_q)
                 print "-----END CALCULATING NEW Q VALUE-------\n\n"
-                self.update( \
-                    neighbor, \
-                    self.Q[neighbor] + self.alpha * max_weights[neighbor] * (r + self.gamma * max_new_neighbors -  max_value ) )
+                self.update(neighbor, new_q)
 
         # select the action to take
         action = self.get_epsilon_greedy(observations, max_action, max_value)
