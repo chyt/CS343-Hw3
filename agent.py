@@ -78,6 +78,7 @@ class MyTabularRLAgent(AgentBrain):
         aMin = self.action_info.min(0)
         aMax = self.action_info.max(0)
         actions = range(int(aMin), int(aMax+1))
+
         return actions
 
     def get_max_action(self, observations):
@@ -140,8 +141,6 @@ class MyTabularRLAgent(AgentBrain):
 
         # update the Q value
         new_Q = Q_old + self.alpha * (r + self.gamma * max_value - Q_old)
-        print "reward: %s" % (r)
-        print "New Q Value: %s" % (new_Q)
         self.update( \
             self.previous_observations, \
             self.previous_action, \
@@ -187,8 +186,10 @@ class MyTilingRLAgent(MyTabularRLAgent):
 
     def get_possible_actions(self, observations):
         """
-        Get the possible actions that can be taken given the state (observations)
+        Get the possible actions that can be taken given the state (observations). Remove actions if it is already found that there's a wall
         """
+
+        # Convert x,y to r,c
         rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
         o = tuple(rc_list)
 
@@ -199,9 +200,8 @@ class MyTilingRLAgent(MyTabularRLAgent):
         if o in self.O:
             for action in actions:
                 if self.O[o][action] == 1:
+                    # If it was previously found that there is a wall, remove that as a possible action
                     actions.remove(action)
-
-        #print "possible actions are: %s" % (actions)
 
         return actions
 
@@ -209,12 +209,9 @@ class MyTilingRLAgent(MyTabularRLAgent):
         """
         Look up the Q-value for the given state (observations), action pair.
         """
-
+        # Convert x,y to r,c
         rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
         o = tuple(rc_list)
-
-        #print "predicting"
-        #print "row: %s | col: %s | tuple: %s" % (row, col, o)
 
         if o not in self.Q:
             return 0
@@ -227,8 +224,6 @@ class MyTilingRLAgent(MyTabularRLAgent):
         and update the blocks drawing.
         """
 
-        #print "observations: %s, %s, %s, %s" % (observations[2],observations[3],observations[4],observations[5])
-
         actions = self.get_possible_actions(observations)
 
         rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
@@ -238,25 +233,21 @@ class MyTilingRLAgent(MyTabularRLAgent):
             self.O[o] = [0, 0, 0, 0]
 
         for x in range(0, 4):
+            # If there is a wall, then record it in Self.O so that it is not a possible action in get_possible_actions
             if observations[x+2]<1.0:
                 self.O[o][x] = 1
-                print "ELIMINATED ACTION: action %s at position %s, %s" % (x, o[0], o[1])
 
-        #print "updating"
-        #print "row: %s | col: %s | tuple: %s" % (row, col, o)
-
+        # Add to the Q table if entry doesn't already exist
         if o not in self.Q:
             self.Q[o] = [0 for a in actions]
         self.Q[o][action] = new_value
 
+        # Prepare x,y tuple for drawing
         draw_o = tuple([x for x in observations])
-        #print "o: %s" % (draw_o,)
-        print "self.Q[o]: %s" % (self.Q[o])
-        #print "action: %s" % (action)
-        #print "new_value: %s" % (new_value)
         self.draw_q(draw_o)
 
     def draw_q(self, o):
+        # Allows drawing of Q values in all the x,y positions in the tile
         e = get_environment()
         if hasattr(e, 'draw_q'):
             rc_list = e.maze.xy2rc(o[0], o[1])
@@ -292,14 +283,14 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         """
         MyTabularRLAgent.__init__(self, gamma, alpha, epsilon) # initialize the superclass
 
+        # Add reverse entries to maze walls
         self.maze_walls = []
         for wall_set in get_environment().maze.walls:
             self.maze_walls.append(wall_set)
             inverted_set = (wall_set[1], wall_set[0])
             self.maze_walls.append(inverted_set)
 
-        #print "maze_walls: %s" % self.maze_walls
-
+    # Find the new x,y position given an action, and existing x,y position
     def get_new_x_y(self, action, x, y):
         #get new position
         if action==0:
@@ -317,12 +308,11 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         Look up the Q-value for the given state (observations), action pair.
         """
         (x, y) = self.get_new_x_y(action, observations[0], observations[1])
-        print "PREDICT CALLED. Current spot is (%s, %s). Calculating value for spot(%s, %s)" % (observations[0], observations[1],x,y)
 
-        #print "after action, new position is %s, %s" % (x,y)
-
+        # Find the file for the x,y value that we are considering
         r, c = get_environment().maze.xy2rc(x, y)
 
+        # Find all the neighbors of the tile
         all_neighbors = []
         for row in range(r-1, r+2):
             for col in range(c-1, c+2):
@@ -334,10 +324,12 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         not_neighbors = []
 
+        # Remove all the adjacent neighbors that have walls
         for i in [1,3,5,7]:
             if all_neighbors[i] != 0 and (all_neighbors[i], all_neighbors[4]) in self.maze_walls:
                 not_neighbors.append(i)
 
+        # Remove all the corner neighbors that have walls
         if self.calculate_corners(all_neighbors, 0, 3, 1):
             not_neighbors.append(0)
 
@@ -353,14 +345,14 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         for i in not_neighbors:
             all_neighbors[i] = 0
 
+        # Build a list of reachable neighbors
         reachable_neighbors = []
 
         for neighbor in all_neighbors:
             if neighbor != 0:
                 reachable_neighbors.append(neighbor)
 
-        print "reachable neighbors of tile (%s, %s): %s" % (r, c, reachable_neighbors)
-
+        # Find the three closest reachable neighbors
         min_distance1 = sys.maxint
         closest_neighbor1 = 0
         min_distance2 = sys.maxint
@@ -370,8 +362,8 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         for neighbor in reachable_neighbors:
             neighbor_x = neighbor[0]*20+18.75
             neighbor_y = neighbor[1]*20+18.75
-            diff_x = abs(observations[0] - neighbor_x)
-            diff_y = abs(observations[1] - neighbor_y)
+            diff_x = abs(x - neighbor_x)
+            diff_y = abs(y - neighbor_y)
             distance = math.sqrt(diff_x*diff_x + diff_y*diff_y)
             if distance < min_distance1:
                 min_distance3 = min_distance2
@@ -389,25 +381,24 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
                 min_distance3 = distance
                 closest_neighbor3 = neighbor
 
-            #print "difference between current position: spot(%s, %s) at tile(%s, %s) and spot(%s, %s) at tile(%s, %s) is %s" % (observations[0], observations[1], r, c, neighbor_x, neighbor_y, neighbor[0], neighbor[1], distance)
-
-        print "Closest neighbors to (%s, %s) are %s ----- %s ----- %s" %(x, y, closest_neighbor1, closest_neighbor2, closest_neighbor3)
-
-        rclist = (r,c)
-        rc = tuple(rclist)
+        # Return the calculated weights and values
         return self.find_value(closest_neighbor1, closest_neighbor2, closest_neighbor3, min_distance1, min_distance2, min_distance3)
 
+    # Method for calculating if corner neighbors are accessible
     def calculate_corners(self, all_neighbors, x, y, z):
         if all_neighbors[x] != 0 and all_neighbors[y] != 0 and all_neighbors[z] != 0:
             return ((all_neighbors[x],all_neighbors[y]) in self.maze_walls or (all_neighbors[y],all_neighbors[4]) in self.maze_walls) and ((all_neighbors[x],all_neighbors[z]) in self.maze_walls or (all_neighbors[z],all_neighbors[4]) in self.maze_walls)
         return True
 
     def find_value(self, neighbor_a, neighbor_b, neighbor_c, dist_a, dist_b, dist_c):
+
+        # Calculate weights
         dist_sum = dist_a + dist_b + dist_c
         weight_a = 1 - (dist_a/dist_sum)
         weight_b = 1 - (dist_b/dist_sum)
         weight_c = 1 - (dist_c/dist_sum)
 
+        # Update Q tables
         old_val_a = 0
         if neighbor_a in self.Q:
             old_val_a = self.Q[neighbor_a]
@@ -426,10 +417,7 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         elif neighbor_c != 0:
             self.Q[neighbor_c] = 0
 
-        #print "Self.Q is %s" % (self.Q)
-
         weights = {neighbor_a: weight_a, neighbor_b: weight_b, neighbor_c: weight_c}
-        #print "weights for %s, %s, %s are %s" % (neighbor_a, neighbor_b, neighbor_c, weights)
 
         predict_value = old_val_a * weight_a + old_val_b * weight_b + old_val_c * weight_c
         return (predict_value, weights)
@@ -437,38 +425,48 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
     def update(self, tile, new_value):
         """
         Update the Q-function table with the new value for the (state, action) pair
-        and update the blocks drawing.
         """
-
-        #print "observations: %s, %s, %s, %s" % (observations[2],observations[3],observations[4],observations[5])
-
         rc_list = (tile[0], tile[1])
         o = tuple(rc_list)
         self.Q[o] = new_value
 
-        #print "UPDATING: self.Q[(%s, %s)]: %s" % (o[0], o[1], self.Q[o])
+    def get_possible_actions(self, observations):
+        """
+        Get the possible actions that can be taken given the state (observations)
+        """
+        aMin = self.action_info.min(0)
+        aMax = self.action_info.max(0)
+        actions = range(int(aMin), int(aMax+1))
+
+        # If there is a wall between the current x,y position and the x,y position that is being considered, remove it from the possible actions
+        rc_list = get_environment().maze.xy2rc(observations[0], observations[1])
+        rc_tuple = tuple(rc_list)
+        for a in actions:
+            (new_x, new_y) = self.get_new_x_y(a, observations[0], observations[1])
+            new_rc_list = get_environment().maze.xy2rc(new_x, new_y)
+            new_rc_tuple = tuple(new_rc_list)
+            if (rc_tuple, new_rc_tuple) in self.maze_walls:
+                actions.remove(a)
+
+        return actions
 
     def get_max_action(self, observations):
         """
-        get the action that is currently estimated to produce the highest Q
+        Get the action and corresponding value and weights that is currently estimated to produce the highest Q
         """
-        #actions = self.get_possible_actions(observations)
-        actions = [0, 1, 2, 3]
-        max_value = 0-sys.maxint
-        max_action = -1
-        max_weights = 0
-        for a in actions:
+        actions = self.get_possible_actions(observations)
+        max_action = actions[0]
+        (max_value, max_weights) = self.predict(observations, max_action)
+        for a in actions[1:]:
             (value, weights) = self.predict(observations, a)
-            print "VALUE: %s" % value
             if value > max_value:
-                print "MAX VALUE IS NOW %s" % (value)
                 max_value = value
                 max_action = a
                 max_weights = weights
         return (max_action, max_value, max_weights)
 
+    # Calculate the values of the neighbors of the new x,y position (the one selected by get_max_action)
     def max_new_neighbors(self, action, observations):
-        #print "GETTING MAX NEW NEIGHBORS"
         (x, y) = self.get_new_x_y(action, observations[0], observations[1])
         new_observations = [x, y]
         (max_action, max_value, max_weights) = self.get_max_action(new_observations)
@@ -507,24 +505,12 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         max_new_neighbors = self.max_new_neighbors(max_action, observations)
 
-        # update the Q values for neighboring tiles
-        #print "Max weights ---> %s" % max_weights
+        # Update the Q values for neighboring tiles
         for neighbor in max_weights:
             if neighbor != 0:
                 new_q = self.Q[neighbor] + self.alpha * max_weights[neighbor] * (r + self.gamma * max_new_neighbors -  max_value )
-                print "\n\n-----START CALCULATING NEW Q VALUE FOR TILE (%s, %s) -------" % (neighbor[0], neighbor[1])
-                print "Original Q value: %s" % (self.Q[neighbor])
-                print "self.alpha: %s" % (self.alpha)
-                print "max_weights[neighbor]: %s" % (max_weights[neighbor])
-                print "reward: %s" % (r)
-                print "self.gamma: %s" % (self.gamma)
-                print "max_new_neighbors: %s" % (max_new_neighbors)
-                print "max_value: %s" % (max_value)
-                print "New Q value: %s" % (new_q)
-                print "-----END CALCULATING NEW Q VALUE-------\n\n"
                 self.update(neighbor, new_q)
 
-        # select the action to take
+        # Select the action to take
         action = self.get_epsilon_greedy(observations, max_action, max_value)
-        print "TAKING ACTION %s" % (max_action)
         return action
