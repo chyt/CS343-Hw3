@@ -411,19 +411,19 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
         old_val_a = 0
         if neighbor_a in self.Q:
             old_val_a = self.Q[neighbor_a]
-        else:
+        elif neighbor_a != 0:
             self.Q[neighbor_a] = 0
 
         old_val_b = 0
         if neighbor_b in self.Q:
             old_val_b = self.Q[neighbor_b]
-        else:
+        elif neighbor_b != 0:
             self.Q[neighbor_b] = 0
 
         old_val_c = 0
         if neighbor_c in self.Q:
-            old_val_a = self.Q[neighbor_c]
-        else:
+            old_val_c = self.Q[neighbor_c]
+        elif neighbor_c != 0:
             self.Q[neighbor_c] = 0
 
         print "Self.Q is %s" % (self.Q)
