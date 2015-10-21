@@ -446,6 +446,21 @@ class MyNearestNeighborsRLAgent(MyTabularRLAgent):
 
         print "UPDATING: self.Q[(%s, %s)]: %s" % (o[0], o[1], self.Q[o])
 
+    def get_max_action(self, observations):
+        """
+        get the action that is currently estimated to produce the highest Q
+        """
+        actions = self.get_possible_actions(observations)
+        max_action = actions[0]
+        max_value = self.predict(observations, max_action)
+        max_weight
+        for a in actions[1:]:
+            value = self.predict(observations, a)
+            if value > max_value:
+                max_value = value
+                max_action = a
+        return (max_action, max_value)
+
     def act(self, time, observations, reward):
         """
         return an action given the reward for the previous action and the new observations
